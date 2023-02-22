@@ -2,3 +2,5 @@ obj
 bin
 .vs
 .idea
+
+appsettings.Development.json
