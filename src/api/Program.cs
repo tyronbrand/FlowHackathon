@@ -1,4 +1,6 @@
 using Azure.Identity;
+using Flow.Net.Sdk.Client.Http;
+using Flow.Net.Sdk.Core.Client;
 using GraphQL.Client.Abstractions;
 using GraphQL.Client.Http;
 using GraphQL.Client.Serializer.SystemTextJson;
@@ -33,6 +35,8 @@ builder.Services.AddScoped<IWalletProvider, Niftory>();
 builder.Services.AddControllers();
 builder.Services.AddApplicationInsightsTelemetry(builder.Configuration);
 
+builder.Services.AddSingleton(f => new FlowClientOptions { ServerUrl = ServerUrl.MainnetHost });
+builder.Services.AddHttpClient<IFlowClient, FlowHttpClient>();
 
 var app = builder.Build();
 

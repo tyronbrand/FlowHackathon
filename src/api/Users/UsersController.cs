@@ -42,5 +42,24 @@ public class UsersController : ControllerBase
         return CreatedAtAction(nameof(CreateUsers), new { unity_id = unityUser.UnityId }, null);
     }
 
+    [HttpPost]
+    [ProducesResponseType(201)]
+    public async Task<ActionResult> BindUsers([FromBody] BindUserToAccount user)
+    {
+        var wallet = await _walletProvider.CreateWalletAsync();
+        var test = await _walletProvider.GetWalletByIdAsync(wallet.Id);
+
+        var unityUser = new User
+        {
+            UnityId = user.unityId,
+            WalletId = wallet.Id            
+        };
+
+        await _repository.AddUserAsync(unityUser);
+
+        return CreatedAtAction(nameof(CreateUsers), new { unity_id = unityUser.UnityId }, null);
+    }
+
     public record CreateUser(string unityId);
+    public record BindUserToAccount(string unityId, string externalAccountAddress);
 }
