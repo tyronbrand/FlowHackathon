@@ -22,30 +22,86 @@ public class CollectionController : ControllerBase
 
     [HttpGet]
     [ProducesResponseType(200)]
-    public async Task<ActionResult<List<AssetLocation>>> GetCollections([FromQuery] string accountAddress)
+    public async Task<ActionResult<List<CollectionInfo>>> GetCollections([FromQuery] string accountAddress)
     {
         var assetLocations = await GetCollectionIds(accountAddress);
 
         return Ok(assetLocations);
     }
 
-    private async Task<List<AssetLocation>> GetCollectionIds(string accountAddress)
+    private async Task<List<CollectionInfo>> GetCollectionIds(string accountAddress)
     {
         var topshotIds = await GetTopShotCollectionIds(accountAddress);
         //await GetNflCollectionIds(accountAddress);
 
-        var locations = new List<AssetLocation>();
+        var locations = new List<CollectionInfo>();
+        Random rnd = new Random();
 
-        foreach(var id in topshotIds)
+        foreach (var id in topshotIds)
         {
-            locations.Add(new AssetLocation
+            var playerName = await GetTopShotCollectionMetadata(accountAddress, id);            
+            
+            locations.Add(new CollectionInfo
             {
+                Name = playerName ?? "Unknown",
                 CustomId = $"TopShot_{id}",
-                Url = $"https://assets.nbatopshot.com/media/{id}/image"
+                Url = $"https://assets.nbatopshot.com/media/{id}/image",
+                Stats = new CardStats
+                {
+                    Attack = rnd.Next(1, 6),
+                    Cost = rnd.Next(1, 4),
+                    Defence = rnd.Next(1, 4),
+                }
             });
         }
 
         return locations;
+    }
+
+    private async Task<string?> GetTopShotCollectionMetadata(string accountAddress, string Id)
+    {
+        var script = @"import TopShot from 0x0b2a3299cc857e29
+
+pub fun main(account: Address, id: UInt64): {String: String} {
+
+    let collectionRef = getAccount(account).getCapability(/public/MomentCollection)
+        .borrow<&{TopShot.MomentCollectionPublic}>()
+        ?? panic(""Could not get public moment collection reference"")
+
+    let token = collectionRef.borrowMoment(id: id)
+        ?? panic(""Could not borrow a reference to the specified moment"")
+
+    let data = token.data
+
+    let metadata = TopShot.getPlayMetaData(playID: data.playID) ?? panic(""Play doesn't exist"")
+
+    return metadata
+}";
+
+        var flowAddress = new FlowAddress(accountAddress);
+
+        var arguments = new List<ICadence>
+        {
+            new CadenceAddress(flowAddress.Address),
+            new CadenceNumber(CadenceNumberType.UInt64, Id)
+        };
+
+        try
+        {
+            var response = await _flowClient.ExecuteScriptAtLatestBlockAsync(
+                new FlowScript
+                {
+                    Script = script,
+                    Arguments = arguments
+                });
+
+            return response.As<CadenceDictionary>().Value.FirstOrDefault(s => s.Key.As<CadenceString>().Value == "FullName")?.Value.As<CadenceString>().Value.ToString();
+        }
+        catch (Exception)
+        {
+            //TODO
+            throw new Exception("Failed");
+        }
     }
 
     private async Task<List<string>> GetTopShotCollectionIds(string accountAddress)
